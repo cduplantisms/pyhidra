@@ -35,7 +35,8 @@ def _debug_callback(fun=None, *, suspend=False, **pydevd_kwargs):
     @functools.wraps(fun)
     def wrapper(*args, **kwargs):
         try:
-            import pydevd # type: ignore
+            import pydevd  # type: ignore
+
             pydevd_kwargs["suspend"] = suspend
             pydevd.settrace(**pydevd_kwargs)
         except ImportError:
@@ -58,6 +59,7 @@ def start(verbose=False) -> "PyhidraLauncher":
     :return: The DeferredPhyidraLauncher used to start the JVM
     """
     from pyhidra.launcher import HeadlessPyhidraLauncher
+
     launcher = HeadlessPyhidraLauncher(verbose=verbose)
     launcher.start()
     return launcher
@@ -68,25 +70,28 @@ def started() -> bool:
     Whether the PyhidraLauncher has already started.
     """
     from pyhidra.launcher import PyhidraLauncher
+
     return PyhidraLauncher.has_launched()
 
 
 def _get_language(id: str) -> "Language":
     from ghidra.program.util import DefaultLanguageService
     from ghidra.program.model.lang import LanguageID, LanguageNotFoundException
+
     try:
         service: "LanguageService" = DefaultLanguageService.getLanguageService()
         return service.getLanguage(LanguageID(id))
     except LanguageNotFoundException:
         # suppress the java exception
         pass
-    raise ValueError("Invalid Language ID: "+id)
+    raise ValueError("Invalid Language ID: " + id)
 
 
-def _get_compiler_spec(lang: "Language", id: str = None) -> "CompilerSpec":
+def _get_compiler_spec(lang: "Language", id: str | None = None) -> "CompilerSpec":
     if id is None:
         return lang.getDefaultCompilerSpec()
     from ghidra.program.model.lang import CompilerSpecID, CompilerSpecNotFoundException
+
     try:
         return lang.getCompilerSpecByID(CompilerSpecID(id))
     except CompilerSpecNotFoundException:
@@ -97,16 +102,17 @@ def _get_compiler_spec(lang: "Language", id: str = None) -> "CompilerSpec":
 
 
 def _setup_project(
-        binary_path: Union[str, Path],
-        project_location: Union[str, Path] = None,
-        project_name: str = None,
-        language: str = None,
-        compiler: str = None,
-        loader: Union[str, JClass] = None
+    binary_path: Union[str, Path],
+    project_location: Union[str, Path] | None = None,
+    project_name: str | None = None,
+    language: str | None = None,
+    compiler: str | None = None,
+    loader: Union[str, JClass] = None,
 ) -> Tuple["GhidraProject", "Program"]:
     from ghidra.base.project import GhidraProject
     from java.lang import ClassLoader
     from java.io import IOException
+
     if binary_path is not None:
         binary_path = Path(binary_path)
     if project_location:
@@ -120,6 +126,7 @@ def _setup_project(
 
     if isinstance(loader, str):
         from java.lang import ClassNotFoundException
+
         try:
             gcl = ClassLoader.getSystemClassLoader()
             loader = JClass(loader, gcl)
@@ -128,8 +135,11 @@ def _setup_project(
 
     if isinstance(loader, JClass):
         from ghidra.app.util.opinion import Loader
+
         if not Loader.class_.isAssignableFrom(loader):
-            raise TypeError(f"{loader} does not implement ghidra.app.util.opinion.Loader")
+            raise TypeError(
+                f"{loader} does not implement ghidra.app.util.opinion.Loader"
+            )
 
     # Open/Create project
     program: "Program" = None
@@ -151,7 +161,9 @@ def _setup_project(
             else:
                 program = project.importProgram(binary_path, loader)
             if program is None:
-                raise RuntimeError(f"Ghidra failed to import '{binary_path}'. Try providing a language manually.")
+                raise RuntimeError(
+                    f"Ghidra failed to import '{binary_path}'. Try providing a language manually."
+                )
         else:
             lang = _get_language(language)
             comp = _get_compiler_spec(lang, compiler)
@@ -198,6 +210,7 @@ def _setup_script(project: "GhidraProject", program: "Program"):
 def _analyze_program(flat_api, program):
     from ghidra.program.util import GhidraProgramUtilities
     from ghidra.app.script import GhidraScriptUtil
+
     if GhidraProgramUtilities.shouldAskToAnalyze(program):
         GhidraScriptUtil.acquireBundleHostReference()
         try:
@@ -212,14 +225,14 @@ def _analyze_program(flat_api, program):
 
 @contextlib.contextmanager
 def open_program(
-        binary_path: Union[str, Path],
-        project_location: Union[str, Path] = None,
-        project_name: str = None,
-        analyze=True,
-        language: str = None,
-        compiler: str = None,
-        loader: Union[str, JClass] = None
-) -> ContextManager["FlatProgramAPI"]: # type: ignore
+    binary_path: Union[str, Path],
+    project_location: Union[str, Path] = None,
+    project_name: str = None,
+    analyze=True,
+    language: str = None,
+    compiler: str = None,
+    loader: Union[str, JClass] = None,
+) -> ContextManager["FlatProgramAPI"]:  # type: ignore
     """
     Opens given binary path in Ghidra and returns FlatProgramAPI object.
 
@@ -249,12 +262,7 @@ def open_program(
     from ghidra.program.flatapi import FlatProgramAPI
 
     project, program = _setup_project(
-        binary_path,
-        project_location,
-        project_name,
-        language,
-        compiler,
-        loader
+        binary_path, project_location, project_name, language, compiler, loader
     )
     GhidraScriptUtil.acquireBundleHostReference()
 
@@ -273,16 +281,16 @@ def open_program(
 
 @contextlib.contextmanager
 def _flat_api(
-        binary_path: Union[str, Path] = None,
-        project_location: Union[str, Path] = None,
-        project_name: str = None,
-        verbose=False,
-        analyze=True,
-        language: str = None,
-        compiler: str = None,
-        loader: Union[str, JClass] = None,
-        *,
-        install_dir: Path = None
+    binary_path: Union[str, Path] = None,
+    project_location: Union[str, Path] = None,
+    project_name: str = None,
+    verbose=False,
+    analyze=True,
+    language: str = None,
+    compiler: str = None,
+    loader: Union[str, JClass] = None,
+    *,
+    install_dir: Path = None,
 ):
     """
     Runs a given script on a given binary path.
@@ -316,12 +324,7 @@ def _flat_api(
     project, program = None, None
     if binary_path or project_location:
         project, program = _setup_project(
-            binary_path,
-            project_location,
-            project_name,
-            language,
-            compiler,
-            loader
+            binary_path, project_location, project_name, language, compiler, loader
         )
 
     from ghidra.app.script import GhidraScriptUtil
@@ -354,7 +357,7 @@ def run_script(
     compiler: str = None,
     loader: Union[str, JClass] = None,
     *,
-    install_dir: Path = None
+    install_dir: Path = None,
 ):
     """
     Runs a given script on a given binary path.
@@ -381,6 +384,15 @@ def run_script(
     :raises TypeError: If the provided loader does not implement `ghidra.app.util.opinion.Loader`.
     """
     script_path = str(script_path)
-    args = binary_path, project_location, project_name, verbose, analyze, lang, compiler, loader
+    args = (
+        binary_path,
+        project_location,
+        project_name,
+        verbose,
+        analyze,
+        lang,
+        compiler,
+        loader,
+    )
     with _flat_api(*args, install_dir=install_dir) as script:
         script.run(script_path, script_args)
